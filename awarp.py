@@ -4,7 +4,7 @@ from numba import jit
 L = 'left'
 T = 'top'
 D = 'diagonal'
-INF = int(1e10)
+INF = int(1e8)
 
 
 @jit(nopython=True)
@@ -81,8 +81,13 @@ def compute_awarp_constrained(d, x, y, w, t_x, t_y):
                     a_d = d[i, j] + (x[i] - y[j]) ** 2
                 a_l = d[i+1, j] + ub_costs_constrained(x[i], y[j], L, w, gap)
                 a_t = d[i, j+1] + ub_costs_constrained(x[i], y[j], T, w, gap)
-                d[i+1, j+1] = min(a_d, a_t, a_l)
 
+                # Avoid overflow
+                val = min(a_d, a_t, a_l, INF)
+                if val < 0:
+                    val = int(INF)
+
+                d[i+1, j+1] = val
 
 def awarp(x, y, w=0):
     d = np.zeros((x.shape[0] + 1, y.shape[0] + 1)).astype(int)
