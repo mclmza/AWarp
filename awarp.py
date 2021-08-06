@@ -100,6 +100,12 @@ def awarp(x, y, w=0):
     d[0, 0] = 0
 
     if w > 0:
+
+        if w < abs(x.shape[0] - y.shape[0]):
+            print("Windows needs to be greater than %d" %
+                  abs(x.shape[0] - y.shape[0]) - 1)
+            return np.nan
+            
         t_x = np.zeros(x.shape[0] + 1).astype(int)
         t_y = np.zeros(y.shape[0] + 1).astype(int)
 
