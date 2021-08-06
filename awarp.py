@@ -4,7 +4,7 @@ from numba import jit
 L = 'left'
 T = 'top'
 D = 'diagonal'
-INF = int(1e10)
+INF = int(1e8)
 
 
 @jit(nopython=True)
@@ -70,10 +70,15 @@ def compute_awarp(d, x, y):
 @jit(nopython=True)
 def compute_awarp_constrained(d, x, y, w, t_x, t_y):
     for i in range(x.shape[0]):
+
+        #Check if we are in the upper triangle
+        right_of_Sakoe_Chiba_band = False
+
         for j in range(y.shape[0]):
             gap = np.absolute(t_x[i] - t_y[j])
             if gap > w and ((j > 0 and t_y[j-1] - t_x[i] > w) or (i > 0 and t_x[i-1] - t_y[j] > w)):
-                d[i+1, j+1] = int(INF)
+                if right_of_Sakoe_Chiba_band:
+                    break
             else:
                 if i > 0 and j > 0:
                     a_d = d[i, j] + ub_costs_constrained(x[i], y[j], D, w, gap)
@@ -81,16 +86,26 @@ def compute_awarp_constrained(d, x, y, w, t_x, t_y):
                     a_d = d[i, j] + (x[i] - y[j]) ** 2
                 a_l = d[i+1, j] + ub_costs_constrained(x[i], y[j], L, w, gap)
                 a_t = d[i, j+1] + ub_costs_constrained(x[i], y[j], T, w, gap)
-                d[i+1, j+1] = min(a_d, a_t, a_l)
 
+                # Avoid overflow
+                val = min(a_d, a_t, a_l, INF)
+                if val < 0:
+                    val = int(INF)
+
+                d[i+1, j+1] = val
 
 def awarp(x, y, w=0):
-    d = np.zeros((x.shape[0] + 1, y.shape[0] + 1)).astype(int)
-    d[:, 0] = int(INF)
-    d[0, :] = int(INF)
+    
+    d = np.full((x.shape[0] + 1, y.shape[0] + 1),int(INF)).astype(int)
     d[0, 0] = 0
 
     if w > 0:
+
+        if w < abs(x.shape[0] - y.shape[0]):
+            print("Windows needs to be greater than %d" %
+                  abs(x.shape[0] - y.shape[0]) - 1)
+            return np.nan
+            
         t_x = np.zeros(x.shape[0] + 1).astype(int)
         t_y = np.zeros(y.shape[0] + 1).astype(int)
 
